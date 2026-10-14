@@ -197,6 +197,17 @@ class SpeechEngine(
     }
 
     /**
+     * Standard speak method for background services & alarm receivers
+     */
+    fun speak(
+        text: String,
+        onStart: (() -> Unit)? = null,
+        onDone: (() -> Unit)? = null
+    ) {
+        speakFallbackTts(text, onStart, onDone)
+    }
+
+    /**
      * Instant Barge-In: immediately halts all neural playback and TTS
      */
     fun stop() {
