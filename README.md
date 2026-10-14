@@ -37,21 +37,29 @@ This project includes a **GitHub Actions Cloud Builder** (`.github/workflows/bui
 * **Custom Assistant Name**: Change her name anytime in Settings (e.g. Jarvis, Friday, Rose).
 
 ### 2. 🔄 Continuous Hands-Free Duplex Voice Loop
-* Turn ON **🔄 Loop** in the app or tap the loop icon in the floating menu.
-* Talk completely hands-free — when Jarvis finishes speaking, the microphone automatically opens again after 400ms without tapping any buttons!
-* Real human conversational flow with rolling multi-turn memory.
+* Tap the prominent **🎙️ TALK** button on the main HUD.
+* **Animated Arc Reactor Hologram**: Turns green (`LISTENING`), gold (`THINKING`), and glowing purple/cyan (`SPEAKING`).
+* **Hands-Free Duplex Flow**: User speaks -> Gemini 3.1 Flash-Lite replies in <1 second -> Jarvis speaks reply aloud -> mic re-opens automatically after 450ms! Talk continuously for hours without touching the screen.
+* **Instant Barge-In**: Interrupt her speech instantly by tapping `[ 🛑 STOP ]` or saying *"Stop"*, *"Ruko"*, or *"Chup"*.
 
-### 3. 🛑 Multiple Emergency Killswitches & Barge-In
+### 3. 🎙️ 4 Selectable Female Voice Models (With Live Audio Preview)
+* Select your preferred companion voice in **Settings** (with 1-tap **🔊 TEST SELECTED VOICE** audio preview):
+  1. **💖 Warm Girlfriend (Hinglish)**: Sweet, affectionate, caring companion tone (Indian English/Hinglish).
+  2. **✨ Sassy & Lively Hinglish**: Energetic, playful teasing girlfriend banter.
+  3. **👑 Victoria (British Jarvis)**: Poised, elegant, classic Jarvis AI persona.
+  4. **🌙 Calm & Gentle (Night Study)**: Soft, soothing late-night study partner.
+
+### 4. 🛑 Multiple Emergency Killswitches & Barge-In
 * **Hardware Volume Down Double-Press**: Rapidly double-press your phone's Volume Down button to instantly kill speech and listening!
 * **Notification STOP Button**: A persistent notification in the status bar and lockscreen features a bright red **🛑 STOP** action button.
 * **Instant Voice Barge-In**: Say *"Stop!"*, *"Chup!"*, *"Quiet!"*, *"Cancel!"*, *"Ruk!"*, or *"Bas!"* while she is speaking.
 * **Big Red STOP Button**: On-screen in the app and on the floating bubble menu.
 
-### 4. 🕶️ Ghost / Private Mode & 🧹 1-Tap Memory Wipe
+### 5. 🕶️ Ghost / Private Mode & 🧹 1-Tap Memory Wipe
 * **Ghost Mode**: Tap the eye icon (`🕶️`) to enter Ghost Mode (Hologram glows in stealth neon purple). No prompts or conversations are saved.
 * **1-Tap Wipe Memory**: Tap the trash icon (`🧹`) to flush all temporary context and chat memory in one go with a cute spoken confirmation!
 
-### 5. 🔐 Settings App Lock (PIN / Password / Biometric)
+### 6. 🔐 Settings App Lock (PIN / Password / Biometric)
 * Configure security locks in Settings:
   * **None**
   * **PIN**
@@ -59,28 +67,28 @@ This project includes a **GitHub Actions Cloud Builder** (`.github/workflows/bui
   * **Biometric Fingerprint / Face Unlock**
 * Protects private chats, personal notes, and API keys from unauthorized access.
 
-### 6. 🛸 Floating Hologram Arc Reactor (Over Other Apps)
+### 7. 🛸 Floating Hologram Arc Reactor (Over Other Apps)
 * A glowing, animated Iron Man Arc Reactor bubble floats over **WhatsApp, YouTube, Instagram, Netflix, or games**.
 * **Drag anywhere**: Smooth touch physics with magnetic edge snap.
 * **Tap to expand**: Gives instant 1-tap access to Talk, Continuous Loop, Camera Vision, Screen Vision, Flashlight, Ghost Mode, and Wipe Memory.
 
-### 7. 📋 Smart Clipboard Assistant
+### 8. 📋 Smart Clipboard Assistant
 * When you copy text anywhere on your phone (in WhatsApp, Chrome, or Notes), a mini floating pill `[ ⚡ Ask Jarvis ]` pops up.
 * Tap it to instantly summarize, translate, or explain the copied text!
 
-### 8. 📚 Study Focus Mode with 2-Stage Distraction Nudge
+### 9. 📚 Study Focus Mode with 2-Stage Distraction Nudge
 * Tap **📚 Study** to start a 25m Pomodoro, 45m deep study, or 60m Board exam focus block.
 * 2-Stage distraction nudge:
   * **Stage 1**: Gentle reminder vibration and alert.
   * **Stage 2**: Loving voice scolding after 2 minutes (*"Adi! Phone rakh do aur padhai par dhyan do, exam aane wala hai!"*).
 
-### 9. 🛠️ 100% Lightweight Offline Native Tools (0% RAM / 0% Lag)
+### 10. 🛠️ 100% Lightweight Offline Native Tools (0% RAM / 0% Lag)
 * **🔦 Torch / Flashlight**: Instant native toggle (< 5ms) via camera flash.
 * **🧮 Calculator**: Instant 1-tap launcher for Xiaomi MIUI / Google Calculator.
 * **📝 Offline Scratchpad**: Quick local notes saved privately on device.
 * **⏰ Native Alarms (`AlarmManager`)**: Vocal reminders that ring even when the phone is asleep.
 
-### 10. 🌐 Live Google Search Grounding & Vision
+### 11. 🌐 Live Google Search Grounding & Vision
 * **Real-time Google Search**: Powered by Gemini API to provide accurate, up-to-the-minute facts, news, scores, and dates.
 * **📱 Screen Vision (`MediaProjection`)**: Inspects active screen pixels without cluttering your photo gallery.
 * **📷 Camera Vision (`CameraX`)**: Fast optic frame capture for real-world object and problem analysis.
