@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark"
+    android:padding="8dp">
+
+    <!-- Top Header Bar -->
+    <LinearLayout
+        android:id="@+id/topBarLayout"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingBottom="6dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvAppTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.2"
+                android:text="J.A.R.V.I.S."
+                android:textColor="@color/cyan_glow"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvActiveProfile"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.08"
+                android:text="ADITYA • FEMALE COMPANION"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- 1-Tap Wipe Memory Button -->
+        <ImageButton
+            android:id="@+id/btnWipeMemory"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Wipe Memory"
+            android:src="@android:drawable/ic_menu_delete"
+            app:tint="@color/red_stop" />
+
+        <!-- Settings Button -->
+        <ImageButton
+            android:id="@+id/btnSettings"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginStart="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Settings"
+            android:src="@android:drawable/ic_menu_preferences"
+            app:tint="@color/cyan_glow" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/headerDivider"
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:background="@color/border_cyan"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topBarLayout" />
+
+    <!-- Chat Messages RecyclerView -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvChatMessages"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginBottom="6dp"
+        android:clipToPadding="false"
+        android:paddingBottom="6dp"
+        app:layout_constraintBottom_toTopOf="@id/quickChipsLayout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/headerDivider" />
+
+    <!-- Typing Indicator -->
+    <TextView
+        android:id="@+id/tvTypingIndicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="4dp"
+        android:text="Jarvis is typing..."
+        android:textColor="@color/cyan_glow"
+        android:textSize="11sp"
+        android:textStyle="italic"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/quickChipsLayout"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Quick Prompt Chips -->
+    <HorizontalScrollView
+        android:id="@+id/quickChipsLayout"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="6dp"
+        android:scrollbars="none"
+        app:layout_constraintBottom_toTopOf="@id/inputBarLayout"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/chipSuno"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_btn_hud"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="✨ Suno na"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textSize="10.5sp"
+                app:backgroundTint="@null" />
+
+            <Button
+                android:id="@+id/chipTired"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_btn_hud"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="😴 Bohat tired hoon"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textSize="10.5sp"
+                app:backgroundTint="@null" />
+
+            <Button
+                android:id="@+id/chipStudy"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/bg_btn_hud"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="📚 Physics revise karwao"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textSize="10.5sp"
+                app:backgroundTint="@null" />
+
+            <Button
+                android:id="@+id/chipMood"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_btn_hud"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="💖 Tumhara mood kaisa hai?"
+                android:textAllCaps="false"
+                android:textColor="@color/text_primary"
+                android:textSize="10.5sp"
+                app:backgroundTint="@null" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Bottom Text Input Bar -->
+    <LinearLayout
+        android:id="@+id/inputBarLayout"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <EditText
+            android:id="@+id/etUserInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_input_box"
+            android:hint="Message Jarvis in Hinglish or English..."
+            android:imeOptions="actionSend"
+            android:inputType="textCapSentences|textMultiLine"
+            android:maxLines="3"
+            android:minHeight="44dp"
+            android:paddingStart="14dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="10dp"
+            android:textColor="#ffffff"
+            android:textColorHint="@color/text_secondary"
+            android:textSize="13sp" />
+
+        <ImageButton
+            android:id="@+id/btnSendText"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_btn_talk"
+            android:contentDescription="Send"
+            android:src="@android:drawable/ic_menu_send"
+            app:backgroundTint="@null"
+            app:tint="@color/bg_dark" />
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
