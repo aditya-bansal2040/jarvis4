@@ -16,6 +16,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
@@ -62,6 +63,7 @@ class MainActivity : AppCompatActivity() {
 
     // Bottom Input Bar
     private lateinit var etUserInput: EditText
+    private lateinit var btnMicInput: ImageButton
     private lateinit var btnSendText: ImageButton
 
     // Core Systems
@@ -77,10 +79,10 @@ class MainActivity : AppCompatActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // State Variables
-    private var isContinuousVoiceMode = false
     private var isListening = false
     private var isSpeaking = false
     private var isGenerating = false
+    private var isContinuousMode = false
 
     companion object {
         const val PREFS_NAME = "jarvis_chat_prefs"
@@ -88,7 +90,8 @@ class MainActivity : AppCompatActivity() {
         const val KEY_MODEL = "gemini_model"
         const val KEY_USER_NAME = "user_name"
         const val KEY_ASSISTANT_NAME = "assistant_name"
-        const val KEY_VOICE_MODEL = "voice_model_id"
+        const val KEY_VOICE_MODEL = "gemini_computer_voice"
+        const val KEY_CONTINUOUS_MODE = "continuous_voice_mode"
         const val KEY_HISTORY = "chat_history_json"
 
         private const val REQUEST_RECORD_AUDIO = 201
@@ -100,12 +103,12 @@ class MainActivity : AppCompatActivity() {
 
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         geminiClient = GeminiClient()
+        speechEngine = SpeechEngine(this)
 
-        val savedVoiceModel = prefs.getString(KEY_VOICE_MODEL, SpeechEngine.MODEL_WARM_GIRLFRIEND)
-            ?: SpeechEngine.MODEL_WARM_GIRLFRIEND
-        speechEngine = SpeechEngine(this) {
-            speechEngine.applyVoiceModel(savedVoiceModel)
-        }
+        val savedVoice = prefs.getString(KEY_VOICE_MODEL, SpeechEngine.DEFAULT_VOICE)
+            ?: SpeechEngine.DEFAULT_VOICE
+        speechEngine.setVoiceModel(savedVoice)
+        isContinuousMode = prefs.getBoolean(KEY_CONTINUOUS_MODE, false)
 
         initViews()
         initSpeechRecognizer()
@@ -139,6 +142,7 @@ class MainActivity : AppCompatActivity() {
         chipMood = findViewById(R.id.chipMood)
 
         etUserInput = findViewById(R.id.etUserInput)
+        btnMicInput = findViewById(R.id.btnMicInput)
         btnSendText = findViewById(R.id.btnSendText)
 
         // Setup Chat RecyclerView
@@ -149,9 +153,13 @@ class MainActivity : AppCompatActivity() {
         rvChatMessages.layoutManager = layoutManager
         rvChatMessages.adapter = chatAdapter
 
-        // Continuous Voice Controls
+        // Voice Controls
         btnVoiceToggle.setOnClickListener {
-            checkAudioPermissionAndToggle()
+            handleMicButtonTapped()
+        }
+
+        btnMicInput.setOnClickListener {
+            handleMicButtonTapped()
         }
 
         btnVoiceStop.setOnClickListener {
@@ -162,11 +170,11 @@ class MainActivity : AppCompatActivity() {
             if (isSpeaking) {
                 handleBargeIn()
             } else {
-                checkAudioPermissionAndToggle()
+                handleMicButtonTapped()
             }
         }
 
-        // Send Actions
+        // Send Text Actions
         btnSendText.setOnClickListener { sendMessage() }
         etUserInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND || actionId == EditorInfo.IME_ACTION_DONE) {
@@ -197,7 +205,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         updateProfileHeader()
-        resetVoiceHudToIdle()
+        resetVoiceHudToIdle("Tap TALK or mic to speak in Hindi/English")
     }
 
     private fun initSpeechRecognizer() {
@@ -217,8 +225,9 @@ class MainActivity : AppCompatActivity() {
             putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf("hi-IN", "en-US"))
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1800L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1200L)
+            // Generous silence windows to prevent rapid cut-offs
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
         }
 
         speechRecognizer?.setRecognitionListener(object : RecognitionListener {
@@ -227,7 +236,11 @@ class MainActivity : AppCompatActivity() {
                 hologramView.setState(HologramView.State.LISTENING)
                 tvVoiceStatus.text = "🟢 LISTENING... Bolo Adi 👂"
                 tvVoiceStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.green_ready))
-                tvHearingPreview.text = "Listening... Speak in Hinglish or English"
+                tvHearingPreview.text = "Listening... Speak in Hindi, Hinglish or English"
+                btnVoiceToggle.text = "🔴 STOP"
+                btnVoiceToggle.setBackgroundResource(R.drawable.bg_btn_stop)
+                btnVoiceToggle.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.red_stop))
+                btnVoiceStop.visibility = View.VISIBLE
             }
 
             override fun onBeginningOfSpeech() {
@@ -245,9 +258,10 @@ class MainActivity : AppCompatActivity() {
                 tvVoiceStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.gold_glow))
             }
 
+            // CRITICAL FIX: NEVER loop on error or silence timeouts! Stop calmly.
             override fun onError(error: Int) {
                 isListening = false
-                handleSpeechError(error)
+                resetVoiceHudToIdle("Mic closed. Tap TALK to speak again.")
             }
 
             override fun onResults(results: Bundle?) {
@@ -257,7 +271,7 @@ class MainActivity : AppCompatActivity() {
                 if (spoken.isNotBlank()) {
                     processVoiceInput(spoken)
                 } else {
-                    restartListeningIfContinuous()
+                    resetVoiceHudToIdle("No speech caught. Tap TALK to try again.")
                 }
             }
 
@@ -273,46 +287,28 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun handleSpeechError(error: Int) {
-        if (!isContinuousVoiceMode || isSpeaking || isGenerating) {
-            resetVoiceHudToIdle()
+    private fun handleMicButtonTapped() {
+        if (isSpeaking) {
+            handleBargeIn()
             return
         }
 
-        // Error 6: Speech timeout, Error 7: No match (user paused or silence)
-        if (error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT || error == SpeechRecognizer.ERROR_NO_MATCH) {
-            tvHearingPreview.text = "Waiting for you to speak..."
-            mainHandler.postDelayed({
-                if (isContinuousVoiceMode && !isSpeaking && !isGenerating && !isListening) {
-                    startListening()
-                }
-            }, 400)
-        } else if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY || error == SpeechRecognizer.ERROR_CLIENT) {
-            mainHandler.postDelayed({
-                if (isContinuousVoiceMode && !isSpeaking && !isGenerating) {
-                    initSpeechRecognizer()
-                    startListening()
-                }
-            }, 600)
-        } else {
-            mainHandler.postDelayed({
-                if (isContinuousVoiceMode && !isSpeaking && !isGenerating && !isListening) {
-                    startListening()
-                }
-            }, 800)
+        if (isListening) {
+            safeStopListening()
+            resetVoiceHudToIdle("Cancelled. Tap TALK to speak.")
+            return
         }
-    }
 
-    private fun checkAudioPermissionAndToggle() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.RECORD_AUDIO),
                 REQUEST_RECORD_AUDIO
             )
-        } else {
-            toggleContinuousVoice()
+            return
         }
+
+        startListening()
     }
 
     override fun onRequestPermissionsResult(
@@ -324,48 +320,15 @@ class MainActivity : AppCompatActivity() {
         if (requestCode == REQUEST_RECORD_AUDIO) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 initSpeechRecognizer()
-                startContinuousVoice()
+                startListening()
             } else {
-                Toast.makeText(this, "Microphone permission is required for voice talking.", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "Microphone permission is required to talk.", Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    private fun toggleContinuousVoice() {
-        if (isContinuousVoiceMode) {
-            stopContinuousVoice()
-        } else {
-            startContinuousVoice()
-        }
-    }
-
-    private fun startContinuousVoice() {
-        isContinuousVoiceMode = true
-        btnVoiceToggle.text = "🔴 STOP TALK"
-        btnVoiceToggle.setBackgroundResource(R.drawable.bg_btn_stop)
-        btnVoiceToggle.setTextColor(ContextCompat.getColor(this, R.color.red_stop))
-        btnVoiceStop.visibility = View.VISIBLE
-
-        tvVoiceStatus.text = "🟢 CONNECTING TO VOICE LOOP..."
-        tvVoiceStatus.setTextColor(ContextCompat.getColor(this, R.color.green_ready))
-        startListening()
-    }
-
-    private fun stopContinuousVoice() {
-        isContinuousVoiceMode = false
-        speechEngine.stop()
-        safeStopListening()
-
-        btnVoiceToggle.text = "🎙️ TALK"
-        btnVoiceToggle.setBackgroundResource(R.drawable.bg_btn_talk)
-        btnVoiceToggle.setTextColor(ContextCompat.getColor(this, R.color.bg_dark))
-        btnVoiceStop.visibility = View.GONE
-
-        resetVoiceHudToIdle()
-    }
-
     private fun startListening() {
-        if (!isContinuousVoiceMode || isSpeaking || isGenerating) return
+        if (isSpeaking || isGenerating) return
         safeStopListening()
         mainHandler.post {
             try {
@@ -387,56 +350,28 @@ class MainActivity : AppCompatActivity() {
         isListening = false
     }
 
-    private fun restartListeningIfContinuous() {
-        if (isContinuousVoiceMode && !isSpeaking && !isGenerating) {
-            mainHandler.postDelayed({
-                if (isContinuousVoiceMode && !isSpeaking && !isGenerating && !isListening) {
-                    startListening()
-                }
-            }, 350)
-        } else {
-            resetVoiceHudToIdle()
-        }
-    }
-
-    /**
-     * Instant Barge-In:
-     * Interrupts Jarvis when she is speaking and immediately opens mic for user
-     */
     private fun handleBargeIn() {
-        if (isSpeaking) {
-            speechEngine.stop()
-            isSpeaking = false
-            btnVoiceStop.visibility = View.GONE
-            if (isContinuousVoiceMode) {
-                tvVoiceStatus.text = "Interrupted. Listening to you now..."
-                startListening()
-            } else {
-                resetVoiceHudToIdle()
-            }
-        } else if (isContinuousVoiceMode) {
-            stopContinuousVoice()
-        }
+        speechEngine.stop()
+        isSpeaking = false
+        btnVoiceStop.visibility = View.GONE
+        resetVoiceHudToIdle("Speech interrupted.")
     }
 
-    private fun resetVoiceHudToIdle() {
-        if (!isContinuousVoiceMode) {
-            hologramView.setState(HologramView.State.IDLE)
-            tvVoiceStatus.text = "⚪ IDLE • Tap TALK to chat hands-free"
-            tvVoiceStatus.setTextColor(ContextCompat.getColor(this, R.color.cyan_glow))
-            tvHearingPreview.text = "Continuous Voice Loop Ready"
-            btnVoiceStop.visibility = View.GONE
-        }
+    private fun resetVoiceHudToIdle(statusMsg: String? = null) {
+        hologramView.setState(HologramView.State.IDLE)
+        tvVoiceStatus.text = "⚪ IDLE • Tap TALK to chat"
+        tvVoiceStatus.setTextColor(ContextCompat.getColor(this, R.color.cyan_glow))
+        tvHearingPreview.text = statusMsg ?: "Ready • Speaks authentic Hindi & Hinglish"
+        btnVoiceToggle.text = "🎙️ TALK"
+        btnVoiceToggle.setBackgroundResource(R.drawable.bg_btn_talk)
+        btnVoiceToggle.setTextColor(ContextCompat.getColor(this, R.color.bg_dark))
+        btnVoiceStop.visibility = View.GONE
     }
 
     private fun processVoiceInput(spokenText: String) {
         val lower = spokenText.lowercase(Locale.ROOT)
-        // Check for emergency voice stop commands
-        if (lower == "stop" || lower == "ruko" || lower == "chup" || lower == "pause" || lower == "cancel" || lower == "band karo") {
-            stopContinuousVoice()
-            val stopReply = "Theek hai Adi, main ruk gayi! Jab bhi baat karni ho, tap kar dena."
-            addJarvisMessage(stopReply)
-            speechEngine.speak(stopReply)
+        if (lower == "stop" || lower == "ruko" || lower == "chup" || lower == "cancel") {
+            handleBargeIn()
             return
         }
 
@@ -446,9 +381,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateProfileHeader() {
         val userName = prefs.getString(KEY_USER_NAME, "Aditya") ?: "Aditya"
-        val voiceModelId = prefs.getString(KEY_VOICE_MODEL, SpeechEngine.MODEL_WARM_GIRLFRIEND)
-        val voiceInfo = SpeechEngine.AVAILABLE_MODELS.firstOrNull { it.id == voiceModelId }
-        val voiceName = voiceInfo?.displayName?.take(18) ?: "WARM COMPANION"
+        val voiceId = prefs.getString(KEY_VOICE_MODEL, SpeechEngine.DEFAULT_VOICE)
+        val voiceInfo = SpeechEngine.COMPUTER_VOICES.firstOrNull { it.id == voiceId }
+        val voiceName = voiceInfo?.displayName?.take(16) ?: "AOEDE"
         tvActiveProfile.text = "${userName.uppercase(Locale.ROOT)} • $voiceName"
     }
 
@@ -534,8 +469,10 @@ class MainActivity : AppCompatActivity() {
         val userName = prefs.getString(KEY_USER_NAME, "Aditya") ?: "Aditya"
         val assistantName = prefs.getString(KEY_ASSISTANT_NAME, "Jarvis") ?: "Jarvis"
         val model = prefs.getString(KEY_MODEL, GeminiClient.DEFAULT_MODEL) ?: GeminiClient.DEFAULT_MODEL
+        val selectedVoice = prefs.getString(KEY_VOICE_MODEL, SpeechEngine.DEFAULT_VOICE) ?: SpeechEngine.DEFAULT_VOICE
 
         lifecycleScope.launch {
+            // Step 1: Sub-second fast text generation
             val result = geminiClient.generateContent(
                 apiKey = apiKey,
                 prompt = queryText,
@@ -553,13 +490,13 @@ class MainActivity : AppCompatActivity() {
                 val replyText = result.getOrNull() ?: "Main sun rahi hoon Adi, batao na!"
                 addJarvisMessage(replyText)
 
-                // Vocalize response
-                speakJarvisResponse(replyText, continueLoopAfter = isContinuousVoiceMode || isFromVoice)
+                // Step 2: Speak with Gemini Computer Voice Model
+                speakWithComputerVoice(apiKey, replyText, selectedVoice, isFromVoice)
             } else {
                 val err = result.exceptionOrNull()?.message ?: "Network error"
                 val errReply = "Arre re Adi, issue aa gaya: $err. Ek baar dobara pucho na!"
                 addJarvisMessage(errReply)
-                speakJarvisResponse(errReply, continueLoopAfter = isContinuousVoiceMode)
+                resetVoiceHudToIdle("Error: $err")
             }
         }
     }
@@ -572,41 +509,72 @@ class MainActivity : AppCompatActivity() {
         saveHistory()
     }
 
-    private fun speakJarvisResponse(text: String, continueLoopAfter: Boolean) {
-        isSpeaking = true
-        hologramView.setState(HologramView.State.SPEAKING)
-        tvVoiceStatus.text = "🟣 SPEAKING... Jarvis speaking 🗣️"
-        tvVoiceStatus.setTextColor(ContextCompat.getColor(this, R.color.cyan_glow))
-        btnVoiceStop.visibility = View.VISIBLE
+    /**
+     * Synthesizes and plays Gemini Neural Computer Voice Audio (Aoede, Kore, Charon, Puck, Fenrir)
+     * Speaks natural Hindi and Hinglish with authentic human emotion
+     */
+    private fun speakWithComputerVoice(apiKey: String, text: String, voiceName: String, isFromVoice: Boolean) {
+        tvVoiceStatus.text = "🟣 SYNTHESIZING VOICE ($voiceName)..."
+        tvVoiceStatus.setTextColor(ContextCompat.getColor(this, R.color.gold_glow))
+        hologramView.setState(HologramView.State.THINKING)
 
-        speechEngine.speak(
-            text = text,
-            onStart = {
-                runOnUiThread {
-                    isSpeaking = true
-                    hologramView.setState(HologramView.State.SPEAKING)
-                    tvVoiceStatus.text = "🟣 SPEAKING... Jarvis speaking 🗣️"
-                    btnVoiceStop.visibility = View.VISIBLE
-                }
-            },
-            onDone = {
-                runOnUiThread {
-                    isSpeaking = false
-                    btnVoiceStop.visibility = View.GONE
+        lifecycleScope.launch {
+            val audioResult = geminiClient.generateSpeech(apiKey, text, voiceName)
 
-                    if (isContinuousVoiceMode && continueLoopAfter) {
-                        // 450ms breath delay to avoid speaker reverberation loop into mic
-                        mainHandler.postDelayed({
-                            if (isContinuousVoiceMode && !isSpeaking && !isGenerating && !isListening) {
-                                startListening()
+            if (audioResult.isSuccess) {
+                val wavBytes = audioResult.getOrNull()!!
+                speechEngine.playNeuralAudio(
+                    wavBytes = wavBytes,
+                    onStart = {
+                        runOnUiThread {
+                            isSpeaking = true
+                            hologramView.setState(HologramView.State.SPEAKING)
+                            tvVoiceStatus.text = "🟣 $voiceName SPEAKING 🗣️"
+                            tvVoiceStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.cyan_glow))
+                            btnVoiceStop.visibility = View.VISIBLE
+                        }
+                    },
+                    onDone = {
+                        runOnUiThread {
+                            isSpeaking = false
+                            btnVoiceStop.visibility = View.GONE
+
+                            if (isContinuousMode && isFromVoice) {
+                                // In Continuous mode: prompt once, but NEVER loop if silent!
+                                tvHearingPreview.text = "Listening... Speak when ready"
+                                mainHandler.postDelayed({
+                                    if (isContinuousMode && !isSpeaking && !isGenerating && !isListening) {
+                                        startListening()
+                                    }
+                                }, 400)
+                            } else {
+                                resetVoiceHudToIdle("Tap TALK to continue conversation")
                             }
-                        }, 450)
-                    } else {
-                        resetVoiceHudToIdle()
+                        }
                     }
-                }
+                )
+            } else {
+                // Network speech fallback to offline TTS if needed
+                speechEngine.speakFallbackTts(
+                    text = text,
+                    onStart = {
+                        runOnUiThread {
+                            isSpeaking = true
+                            hologramView.setState(HologramView.State.SPEAKING)
+                            tvVoiceStatus.text = "🟣 SPEAKING..."
+                            btnVoiceStop.visibility = View.VISIBLE
+                        }
+                    },
+                    onDone = {
+                        runOnUiThread {
+                            isSpeaking = false
+                            btnVoiceStop.visibility = View.GONE
+                            resetVoiceHudToIdle("Tap TALK to speak")
+                        }
+                    }
+                )
             }
-        )
+        }
     }
 
     private fun wipeChat() {
@@ -643,23 +611,46 @@ class MainActivity : AppCompatActivity() {
             setText(prefs.getString(KEY_ASSISTANT_NAME, "Jarvis"))
         }
 
-        // Voice Model Selector
+        // Computer Voice Model Selector
         val spinnerVoice = Spinner(this)
-        val voiceOptions = SpeechEngine.AVAILABLE_MODELS.map { it.displayName }
+        val voiceOptions = SpeechEngine.COMPUTER_VOICES.map { it.displayName }
         val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, voiceOptions)
         spinnerVoice.adapter = spinnerAdapter
 
-        val savedVoiceId = prefs.getString(KEY_VOICE_MODEL, SpeechEngine.MODEL_WARM_GIRLFRIEND)
-        val currentIndex = SpeechEngine.AVAILABLE_MODELS.indexOfFirst { it.id == savedVoiceId }.coerceAtLeast(0)
+        val savedVoiceId = prefs.getString(KEY_VOICE_MODEL, SpeechEngine.DEFAULT_VOICE)
+        val currentIndex = SpeechEngine.COMPUTER_VOICES.indexOfFirst { it.id == savedVoiceId }.coerceAtLeast(0)
         spinnerVoice.setSelection(currentIndex)
 
+        val cbContinuous = CheckBox(this).apply {
+            text = "Continuous Voice Loop (Auto-relisten after reply)"
+            isChecked = prefs.getBoolean(KEY_CONTINUOUS_MODE, false)
+        }
+
         val btnPreviewVoice = Button(this).apply {
-            text = "🔊 TEST SELECTED VOICE"
+            text = "🔊 TEST COMPUTER VOICE"
             setOnClickListener {
+                val currentKey = etApi.text.toString().trim()
+                if (currentKey.isBlank()) {
+                    Toast.makeText(this@MainActivity, "Please enter API Key above first.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
                 val selectedIdx = spinnerVoice.selectedItemPosition
-                val selectedModel = SpeechEngine.AVAILABLE_MODELS.getOrNull(selectedIdx)?.id
-                    ?: SpeechEngine.MODEL_WARM_GIRLFRIEND
-                speechEngine.previewVoice(selectedModel, "Hey Adi! Main yahan hoon tumhare paas. Kaisi lagi meri voice?")
+                val selectedVoice = SpeechEngine.COMPUTER_VOICES.getOrNull(selectedIdx)?.id
+                    ?: SpeechEngine.DEFAULT_VOICE
+
+                Toast.makeText(this@MainActivity, "Synthesizing $selectedVoice in Hindi...", Toast.LENGTH_SHORT).show()
+                lifecycleScope.launch {
+                    val testAudio = geminiClient.generateSpeech(
+                        apiKey = currentKey,
+                        text = "Hey Adi! Main yahan hoon tumhare paas. Kaisi lagi meri voice?",
+                        voiceName = selectedVoice
+                    )
+                    if (testAudio.isSuccess) {
+                        speechEngine.playNeuralAudio(testAudio.getOrNull()!!)
+                    } else {
+                        Toast.makeText(this@MainActivity, "TTS error: ${testAudio.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         }
 
@@ -669,31 +660,35 @@ class MainActivity : AppCompatActivity() {
         layout.addView(etUser)
         layout.addView(TextView(this).apply { text = "Assistant Name:" })
         layout.addView(etAssistant)
-        layout.addView(TextView(this).apply { text = "Voice Model (Girlfriend / Companion):" })
+        layout.addView(TextView(this).apply { text = "Gemini Neural Computer Voice Model:" })
         layout.addView(spinnerVoice)
         layout.addView(btnPreviewVoice)
+        layout.addView(cbContinuous)
 
         AlertDialog.Builder(this)
-            .setTitle(if (isFirstTime) "Welcome to J.A.R.V.I.S." else "Settings & Voice Models")
+            .setTitle(if (isFirstTime) "Welcome to J.A.R.V.I.S." else "Settings & Computer Voice Models")
             .setView(layout)
             .setPositiveButton("SAVE") { _, _ ->
                 val newKey = etApi.text.toString().trim()
                 val newUser = etUser.text.toString().trim().ifEmpty { "Aditya" }
                 val newAssistant = etAssistant.text.toString().trim().ifEmpty { "Jarvis" }
                 val selectedIdx = spinnerVoice.selectedItemPosition
-                val selectedVoice = SpeechEngine.AVAILABLE_MODELS.getOrNull(selectedIdx)?.id
-                    ?: SpeechEngine.MODEL_WARM_GIRLFRIEND
+                val selectedVoice = SpeechEngine.COMPUTER_VOICES.getOrNull(selectedIdx)?.id
+                    ?: SpeechEngine.DEFAULT_VOICE
+                val newContinuous = cbContinuous.isChecked
 
                 prefs.edit()
                     .putString(KEY_API, newKey)
                     .putString(KEY_USER_NAME, newUser)
                     .putString(KEY_ASSISTANT_NAME, newAssistant)
                     .putString(KEY_VOICE_MODEL, selectedVoice)
+                    .putBoolean(KEY_CONTINUOUS_MODE, newContinuous)
                     .apply()
 
-                speechEngine.applyVoiceModel(selectedVoice)
+                speechEngine.setVoiceModel(selectedVoice)
+                isContinuousMode = newContinuous
                 updateProfileHeader()
-                Toast.makeText(this, "Settings saved!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Voice Model saved: $selectedVoice", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton(if (isFirstTime) null else "CANCEL", null)
             .setCancelable(!isFirstTime)
@@ -702,21 +697,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        if (isContinuousVoiceMode) {
-            safeStopListening()
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (isContinuousVoiceMode && !isSpeaking && !isGenerating && !isListening) {
-            startListening()
-        }
+        safeStopListening()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        isContinuousVoiceMode = false
         speechEngine.shutdown()
         try {
             speechRecognizer?.destroy()

@@ -233,6 +233,110 @@ TECHNICAL HONESTY:
         return Result.success("All systems nominal, sir. I have processed your request.")
     }
 
+    /**
+     * Generates real neural computer voice audio (WAV) via Gemini 3.8 Flash TTS
+     * Supports computer voice models: Aoede, Kore, Charon, Puck, Fenrir
+     * Speaks natural English, Hindi, and Hinglish with real human expressiveness
+     */
+    suspend fun generateSpeech(
+        apiKey: String,
+        text: String,
+        voiceName: String = "Aoede"
+    ): Result<ByteArray> = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) {
+            return@withContext Result.failure(Exception("Gemini API key is missing."))
+        }
+
+        // Clean markdown, brackets, and emojis for pure spoken audio
+        val clean = text
+            .replace(Regex("[*#`_~>]"), "")
+            .replace(Regex("\\[(.*?)\\]\\(.*?\\)"), "$1")
+            .replace(Regex("""[\uD83C-\uDBFF\uDC00-\uDFFF]+"""), "")
+            .trim()
+
+        if (clean.isBlank()) {
+            return@withContext Result.failure(Exception("Speech text is empty."))
+        }
+
+        val endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent?key=$apiKey"
+        val root = JsonObject().apply {
+            val contents = JsonArray().apply {
+                val turn = JsonObject().apply {
+                    val parts = JsonArray().apply {
+                        val part = JsonObject().apply {
+                            addProperty("text", clean)
+                        }
+                        add(part)
+                    }
+                    add("parts", parts)
+                }
+                add(turn)
+            }
+            add("contents", contents)
+
+            val genConfig = JsonObject().apply {
+                val responseModalities = JsonArray().apply {
+                    add("AUDIO")
+                }
+                add("responseModalities", responseModalities)
+
+                val speechConfig = JsonObject().apply {
+                    val voiceConfig = JsonObject().apply {
+                        addProperty("voice", voiceName)
+                    }
+                    add("voiceConfig", voiceConfig)
+                }
+                add("speechConfig", speechConfig)
+            }
+            add("generationConfig", genConfig)
+        }
+
+        try {
+            val reqBody = root.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+            val request = Request.Builder()
+                .url(endpoint)
+                .post(reqBody)
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                val errBody = response.body?.string() ?: ""
+                return@withContext Result.failure(IOException("TTS API Error (${response.code}): $errBody"))
+            }
+
+            val respString = response.body?.string() ?: ""
+            val jsonResp = gson.fromJson(respString, JsonObject::class.java)
+            val candidates = jsonResp.getAsJsonArray("candidates")
+            if (candidates == null || candidates.size() == 0) {
+                return@withContext Result.failure(Exception("No speech candidates returned."))
+            }
+
+            val parts = candidates[0].asJsonObject
+                .getAsJsonObject("content")
+                ?.getAsJsonArray("parts")
+
+            var b64Audio: String? = null
+            if (parts != null) {
+                for (i in 0 until parts.size()) {
+                    val p = parts[i].asJsonObject
+                    if (p.has("inlineData")) {
+                        b64Audio = p.getAsJsonObject("inlineData").get("data")?.asString
+                        break
+                    }
+                }
+            }
+
+            if (b64Audio.isNullOrBlank()) {
+                return@withContext Result.failure(Exception("No audio bytes returned in response."))
+            }
+
+            val wavBytes = Base64.decode(b64Audio, Base64.DEFAULT)
+            Result.success(wavBytes)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     fun cancelActiveCall() {
         try {
             activeCall?.cancel()
